@@ -39,6 +39,11 @@ _refs:
       echo "export GUS_RELEASE=offcore.tooling.$GUS_BUILD" >> $BASH_ENV
 
 commands:
+  just-a-test-command:
+    description: Is this the right way for invoking?
+    steps:
+      - run: echo "Hello!"
+
   install:
     description: Install dependencies
     steps:
@@ -53,6 +58,7 @@ commands:
     steps:
       - checkout
       - restore_cache: *restore_cache
+      - just-a-test-command
       - run: npm install
       - run:
           name: 'Compile in production mode'
@@ -227,7 +233,7 @@ jobs:
           location: REPO_LOCATION
           release: GUS_RELEASE
       - run: *gh-config
-      - run: install
+      - install
       - run:
           name: 'Compile in production mode'
           environment:
