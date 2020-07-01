@@ -11,7 +11,6 @@ version: 2.1
 
 orbs:
   win: circleci/windows@2.2.0
-  node: circleci/node@3.0.1
   sfchangecase: salesforce/change-case-management@3
 
 _refs:
@@ -22,12 +21,11 @@ _refs:
   ssh-config: &ssh-config
     fingerprints:
       - '3b:68:69:7d:19:a4:50:69:ad:b8:db:57:f9:9c:f0:3f'
-  install: &install
-    name: Install dependencies
-    command: |
-      npm --version
-      node --version
-      npm install
+  restore_cache: &restore_cache
+    keys:
+      - dependency-cache-v2-{{ checksum "package.json" }}
+      # if cache for exact version of 'package.json' is not present, then load the most recent cache
+      - dependency-cache-v2-
   gh-config: &gh-config
     name: Configuring GitHub
     command: |
@@ -41,25 +39,20 @@ _refs:
       echo "export GUS_RELEASE=offcore.tooling.$GUS_BUILD" >> $BASH_ENV
 
 commands:
-  restore_cache:
-    description: 'Restore the cache using the exact version of `package.json`, otherwise load the most recent cache'
+  install:
+    description: Install dependencies
     steps:
-      keys:
-        - dependency-cache-v2-{{ checksum "package.json" }}
-        - dependency-cache-v2-
-
-  restore_cache-win:
-    description: 'Restore the cache for windows using the exact version of `package.json`, otherwise load the most recent cache'
-    steps:
-      keys:
-        - dependency-cache-win3-{{ checksum "package.json" }}
-        - dependency-cache-win3-
+      - run:
+          command: |
+            npm --version
+            node --version
+            npm install
 
   build-artifacts:
     description: 'Building and archiving extension artifacts.'
     steps:
       - checkout
-      - restore_cache
+      - restore_cache: *restore_cache
       - run: npm install
       - run:
           name: 'Compile in production mode'
@@ -87,7 +80,11 @@ commands:
     steps:
       - run: git config --global core.autocrlf false
       - checkout
-      - restore_cache-win
+      - restore_cache:
+          keys:
+            - dependency-cache-win3-{{ checksum "package.json" }}
+            # if cache for exact version of 'package.json' is not present, then load the most recent cache
+            - dependency-cache-win3-
       - run:
           name: 'Install node'
           shell: bash.exe
@@ -215,13 +212,12 @@ jobs:
               Write-Host "Forcing build failure due to test failure(s) :'("
               $host.SetShouldExit(1)
             }
-
   publish:
     <<: *defaults
     steps:
       - add_ssh_keys: *ssh-config
       - checkout
-      - restore_cache
+      - restore_cache: *restore_cache
       - sfchangecase/install
       - run: *gus-prepare-environment-variables
       - sfchangecase/create:
@@ -231,7 +227,7 @@ jobs:
           location: REPO_LOCATION
           release: GUS_RELEASE
       - run: *gh-config
-      - run: *install
+      - run: install
       - run:
           name: 'Compile in production mode'
           environment:
@@ -281,9 +277,9 @@ jobs:
     steps:
       - add_ssh_keys: *ssh-config
       - checkout
-      - restore_cache
+      - restore_cache: *restore_cache
       - run: *gh-config
-      - run: *install
+      - install
       - run:
           name: Install Lerna
           command: sudo npm install -g lerna@3.13.1
